@@ -1,0 +1,2192 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Physics Simulator – المولد الكهربي</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
+
+  :root {
+    --bg: #070b14;
+    --surface: #0d1525;
+    --surface2: #111e35;
+    --border: #1a2e50;
+    --accent: #00d4ff;
+    --accent2: #7b2fff;
+    --accent3: #ff6b35;
+    --green: #00ff88;
+    --red: #ff3366;
+    --yellow: #ffd700;
+    --text: #e0eeff;
+    --text-dim: #7090b0;
+    --glow: 0 0 20px rgba(0,212,255,0.4);
+    --glow2: 0 0 20px rgba(123,47,255,0.4);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cairo', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none; z-index:0;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    position: relative; z-index: 10;
+    background: linear-gradient(135deg, #070b14 0%, #0d1a30 50%, #070b14 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 22px 30px;
+    text-align: center;
+    box-shadow: 0 4px 30px rgba(0,212,255,0.15);
+  }
+  header::after {
+    content:'';
+    position:absolute; bottom:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent), transparent);
+    animation: scanline 3s linear infinite;
+  }
+  @keyframes scanline { 0%{opacity:0.5} 50%{opacity:1} 100%{opacity:0.5} }
+
+  .header-badge {
+    display:inline-block;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    color:#fff; font-size:0.7rem; font-weight:700;
+    padding:3px 12px; border-radius:20px; letter-spacing:2px;
+    margin-bottom:8px; text-transform:uppercase;
+  }
+  header h1 {
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent), #fff, var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    line-height: 1.2;
+  }
+  header p.subtitle {
+    color: var(--text-dim); font-size:0.95rem; margin-top:6px;
+    direction: rtl;
+  }
+  .sponsor {
+    margin-top: 10px;
+    display:inline-flex; align-items:center; gap:8px;
+    background: rgba(123,47,255,0.15);
+    border: 1px solid rgba(123,47,255,0.3);
+    padding: 6px 18px; border-radius: 30px;
+    font-size: 0.85rem; color: #c0a0ff;
+  }
+  .sponsor span { color: var(--accent2); font-weight:700; }
+
+  /* ─── NAV ─── */
+  nav {
+    position: sticky; top:0; z-index: 100;
+    background: rgba(7,11,20,0.95);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar { display:none; }
+  .nav-inner {
+    display:flex; gap:4px; padding:8px 0;
+    min-width: max-content;
+  }
+  .nav-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    padding: 7px 14px; border-radius: 8px;
+    cursor: pointer; font-family: 'Cairo', sans-serif;
+    font-size: 0.8rem; white-space: nowrap;
+    transition: all 0.25s;
+  }
+  .nav-btn:hover { color: var(--accent); border-color: rgba(0,212,255,0.3); }
+  .nav-btn.active {
+    background: rgba(0,212,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(0,212,255,0.2);
+  }
+
+  /* ─── MAIN ─── */
+  main { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:24px 16px 60px; }
+
+  .section { display:none; animation: fadeIn 0.4s ease; }
+  .section.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ─── CARDS ─── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px;
+    margin-bottom: 20px;
+    transition: border-color 0.3s;
+  }
+  .card:hover { border-color: rgba(0,212,255,0.3); }
+  .card-glow {
+    background: linear-gradient(135deg, rgba(0,212,255,0.05), rgba(123,47,255,0.05));
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 16px; padding: 24px; margin-bottom: 20px;
+    box-shadow: 0 0 30px rgba(0,212,255,0.08);
+  }
+
+  h2.section-title {
+    font-size:1.7rem; font-weight:900;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text;
+    margin-bottom:20px; padding-bottom:12px;
+    border-bottom:1px solid var(--border);
+  }
+  h3.card-title {
+    color: var(--accent); font-size:1.1rem; font-weight:700;
+    margin-bottom:14px; display:flex; align-items:center; gap:8px;
+  }
+  h3.card-title::before {
+    content:''; display:inline-block; width:4px; height:20px;
+    background: linear-gradient(180deg, var(--accent), var(--accent2));
+    border-radius:2px;
+  }
+
+  p.body-text {
+    color: #b0c8e0; line-height:1.9; font-size:0.95rem;
+    margin-bottom:10px;
+  }
+  .highlight { color: var(--accent); font-weight:700; }
+  .highlight2 { color: var(--accent2); font-weight:700; }
+  .highlight3 { color: var(--yellow); font-weight:700; }
+
+  /* ─── FORMULA BOX ─── */
+  .formula-box {
+    background: rgba(0,212,255,0.06);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius:10px; padding:16px 20px;
+    margin:14px 0; text-align:center;
+    font-size:1.1rem; color: var(--accent);
+    font-weight:700; letter-spacing:1px;
+    box-shadow: inset 0 0 20px rgba(0,212,255,0.05);
+  }
+  .formula-box .formula-label {
+    font-size:0.75rem; color:var(--text-dim); display:block; margin-top:4px;
+    font-weight:400;
+  }
+
+  /* ─── SIM CONTROLS ─── */
+  .sim-controls {
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    margin: 16px 0;
+  }
+  .btn {
+    padding: 9px 22px; border-radius:9px; border:none;
+    cursor:pointer; font-family:'Cairo',sans-serif;
+    font-size:0.9rem; font-weight:700;
+    transition: all 0.2s;
+  }
+  .btn-start {
+    background: linear-gradient(135deg, #00d4ff, #0099cc);
+    color: #000;
+    box-shadow: 0 0 18px rgba(0,212,255,0.4);
+  }
+  .btn-start:hover { transform:translateY(-2px); box-shadow:0 4px 24px rgba(0,212,255,0.5); }
+  .btn-pause {
+    background: linear-gradient(135deg, #ffd700, #ff9900);
+    color:#000;
+    box-shadow: 0 0 18px rgba(255,215,0,0.3);
+  }
+  .btn-pause:hover { transform:translateY(-2px); }
+  .btn-reset {
+    background: linear-gradient(135deg, #ff3366, #cc0033);
+    color:#fff;
+    box-shadow: 0 0 18px rgba(255,51,102,0.3);
+  }
+  .btn-reset:hover { transform:translateY(-2px); }
+  .btn-show {
+    background: linear-gradient(135deg, var(--accent2), #5500cc);
+    color:#fff;
+    box-shadow: 0 0 18px rgba(123,47,255,0.3);
+  }
+  .btn-show:hover { transform:translateY(-2px); }
+
+  /* ─── SLIDERS ─── */
+  .slider-wrap {
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  .slider-wrap label { color:var(--text-dim); font-size:0.9rem; min-width:120px; }
+  .slider-wrap input[type=range] {
+    -webkit-appearance:none; width:180px; height:6px;
+    background: var(--border); border-radius:3px; outline:none;
+  }
+  .slider-wrap input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:18px; height:18px;
+    border-radius:50%; background: var(--accent);
+    box-shadow: 0 0 10px var(--accent); cursor:pointer;
+  }
+  .slider-val {
+    color: var(--accent); font-weight:700; min-width:60px;
+    background: rgba(0,212,255,0.08);
+    padding:3px 10px; border-radius:6px;
+    font-size:0.9rem;
+  }
+
+  /* ─── CANVAS ─── */
+  canvas {
+    border-radius:12px;
+    border:1px solid var(--border);
+    display:block;
+  }
+  .canvas-wrap {
+    display:flex; flex-wrap:wrap; gap:16px;
+    justify-content:center; margin:16px 0;
+  }
+  .canvas-label {
+    text-align:center; color:var(--text-dim);
+    font-size:0.8rem; margin-top:6px;
+  }
+
+  /* ─── ANGLE TABLE ─── */
+  .angle-grid {
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap:12px; margin:16px 0;
+  }
+  .angle-card {
+    background: var(--surface2);
+    border:1px solid var(--border);
+    border-radius:12px; padding:16px;
+    text-align:center; cursor:pointer;
+    transition:all 0.25s;
+  }
+  .angle-card:hover, .angle-card.active-angle {
+    border-color: var(--accent);
+    box-shadow: 0 0 16px rgba(0,212,255,0.2);
+  }
+  .angle-deg { font-size:1.6rem; font-weight:900; color:var(--accent); }
+  .angle-info { font-size:0.8rem; color:var(--text-dim); margin-top:4px; }
+
+  /* ─── COMPARISON TABLE ─── */
+  .comp-table {
+    width:100%; border-collapse:collapse; margin:16px 0;
+    font-size:0.9rem;
+  }
+  .comp-table th {
+    background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,47,255,0.15));
+    color:var(--accent); padding:12px 16px;
+    border:1px solid var(--border); font-weight:700;
+  }
+  .comp-table td {
+    padding:11px 16px; border:1px solid var(--border);
+    color:var(--text); line-height:1.6;
+  }
+  .comp-table tr:nth-child(even) td { background:rgba(0,212,255,0.03); }
+  .comp-table tr:hover td { background:rgba(0,212,255,0.06); }
+
+  /* ─── PROBLEM CARDS ─── */
+  .problem-card {
+    background: var(--surface2);
+    border:1px solid var(--border);
+    border-radius:14px; padding:20px;
+    margin-bottom:16px;
+  }
+  .problem-number {
+    display:inline-block;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    color:#fff; font-weight:900; font-size:0.85rem;
+    padding:3px 12px; border-radius:20px; margin-bottom:10px;
+  }
+  .solution-box {
+    display:none;
+    background: rgba(0,255,136,0.05);
+    border:1px solid rgba(0,255,136,0.2);
+    border-radius:10px; padding:16px; margin-top:12px;
+    animation: fadeIn 0.3s ease;
+  }
+  .solution-step {
+    display:flex; gap:12px; margin-bottom:10px;
+    align-items:flex-start;
+  }
+  .step-num {
+    background: rgba(0,212,255,0.1);
+    border:1px solid rgba(0,212,255,0.3);
+    color:var(--accent); font-weight:700; font-size:0.8rem;
+    padding:2px 9px; border-radius:6px; flex-shrink:0; margin-top:2px;
+  }
+
+  /* ─── EMF CALCULATOR ─── */
+  .calc-grid {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:14px; margin:16px 0;
+  }
+  .calc-field { display:flex; flex-direction:column; gap:6px; }
+  .calc-field label { font-size:0.85rem; color:var(--text-dim); }
+  .calc-field input {
+    background: var(--surface2);
+    border:1px solid var(--border);
+    color:var(--text); padding:10px 14px;
+    border-radius:8px; font-size:0.95rem;
+    font-family:'Cairo',sans-serif;
+    outline:none; transition:border-color 0.2s;
+  }
+  .calc-field input:focus { border-color:var(--accent); box-shadow:0 0 10px rgba(0,212,255,0.1); }
+  .calc-result {
+    background: rgba(0,255,136,0.06);
+    border:1px solid rgba(0,255,136,0.25);
+    border-radius:10px; padding:16px; margin-top:8px;
+    display:none;
+  }
+  .calc-result .res-val {
+    font-size:1.4rem; font-weight:900; color:var(--green);
+  }
+
+  /* ─── MISTAKE CARDS ─── */
+  .mistake-card {
+    display:flex; gap:14px; align-items:flex-start;
+    background: rgba(255,51,102,0.05);
+    border:1px solid rgba(255,51,102,0.2);
+    border-radius:12px; padding:16px; margin-bottom:12px;
+  }
+  .mistake-icon { font-size:1.6rem; flex-shrink:0; }
+
+  /* ─── COMPONENTS LIST ─── */
+  .component-item {
+    display:flex; gap:14px; align-items:center;
+    background: var(--surface2);
+    border:1px solid var(--border);
+    border-radius:12px; padding:16px;
+    margin-bottom:12px; cursor:pointer;
+    transition: all 0.25s;
+  }
+  .component-item:hover {
+    border-color:var(--accent);
+    transform:translateX(-4px);
+  }
+  .comp-icon {
+    width:48px; height:48px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.4rem; flex-shrink:0;
+  }
+  .comp-name { color:var(--accent); font-weight:700; font-size:1rem; }
+  .comp-desc { color:var(--text-dim); font-size:0.85rem; line-height:1.6; }
+
+  /* ─── INFO BADGE ─── */
+  .info-badge {
+    display:inline-flex; align-items:center; gap:6px;
+    background: rgba(0,212,255,0.08);
+    border:1px solid rgba(0,212,255,0.2);
+    color:var(--accent); padding:4px 12px;
+    border-radius:20px; font-size:0.8rem; font-weight:600;
+    margin:4px;
+  }
+
+  /* ─── PULSE ANIMATION ─── */
+  @keyframes pulse-glow {
+    0%,100%{box-shadow:0 0 10px rgba(0,212,255,0.2)}
+    50%{box-shadow:0 0 30px rgba(0,212,255,0.5)}
+  }
+  .pulse { animation: pulse-glow 2s ease infinite; }
+
+  /* ─── WAVEFORM LEGEND ─── */
+  .legend { display:flex; gap:18px; flex-wrap:wrap; margin:8px 0; }
+  .legend-item { display:flex; align-items:center; gap:6px; font-size:0.82rem; color:var(--text-dim); }
+  .legend-dot { width:12px; height:3px; border-radius:2px; }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--accent); }
+
+  /* RESPONSIVE */
+  @media(max-width:600px){
+    .canvas-wrap { flex-direction:column; align-items:center; }
+    .comp-table { font-size:0.78rem; }
+    .comp-table td, .comp-table th { padding:8px; }
+  }
+
+  /* ELECTRON ANIMATION */
+  @keyframes electron-move {
+    0%{stroke-dashoffset:200}
+    100%{stroke-dashoffset:0}
+  }
+  .electron-path {
+    stroke-dasharray:8 6;
+    animation: electron-move 1s linear infinite;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-badge">⚡ Interactive Physics Lab</div>
+  <h1>Physics Simulator</h1>
+  <p class="subtitle">مختبر الفيزياء التفاعلي – المولد الكهربي (Dynamo)</p>
+  <div class="sponsor">⚡ <span>برعاية المهندس زياد عبد المنصف</span></div>
+</header>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner" id="navInner">
+    <button class="nav-btn active" onclick="showSection('s1',this)">١· مقدمة</button>
+    <button class="nav-btn" onclick="showSection('s2',this)">٢· AC Generator</button>
+    <button class="nav-btn" onclick="showSection('s3',this)">٣· Faraday's Law</button>
+    <button class="nav-btn" onclick="showSection('s4',this)">٤· Rotation Angles</button>
+    <button class="nav-btn" onclick="showSection('s5',this)">٥· المكونات</button>
+    <button class="nav-btn" onclick="showSection('s6',this)">٦· DC Generator</button>
+    <button class="nav-btn" onclick="showSection('s7',this)">٧· Types of EMF</button>
+    <button class="nav-btn" onclick="showSection('s8',this)">٨· مسائل</button>
+    <button class="nav-btn" onclick="showSection('s9',this)">٩· Electron Flow</button>
+    <button class="nav-btn" onclick="showSection('s10',this)">١٠· مقارنة</button>
+    <button class="nav-btn" onclick="showSection('s11',this)">١١· أخطاء شائعة</button>
+  </div>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 1 – INTRODUCTION -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s1" class="section active">
+  <h2 class="section-title">⚡ المولد الكهربي (Electric Generator / Dynamo)</h2>
+
+  <div class="card-glow">
+    <h3 class="card-title">إيه هو الـ Generator؟</h3>
+    <p class="body-text">
+      الـ <span class="highlight">Electric Generator</span> (أو زي ما بنسميه الـ <span class="highlight">Dynamo</span>) هو جهاز بيحوّل
+      <span class="highlight3">Mechanical Energy</span> (الطاقة الميكانيكية) لـ
+      <span class="highlight">Electrical Energy</span> (طاقة كهربية).
+    </p>
+    <p class="body-text">
+      ببساطة: لو دوّرت ملف (coil) جوه مجال مغناطيسي (magnetic field)، هتلاقي إنك بتولّد
+      <span class="highlight">EMF</span> (قوة دافعة كهرومغناطيسية) وتيار كهربي!
+    </p>
+    <p class="body-text">
+      ده بيحصل بسبب <span class="highlight2">Electromagnetic Induction</span> – اللي اكتشفها العالم الكبير
+      <span class="highlight3">Michael Faraday</span> سنة 1831.
+    </p>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:16px 0;">
+    <div class="card" style="text-align:center;padding:28px 20px;">
+      <div style="font-size:2.5rem;margin-bottom:10px;">⚙️</div>
+      <div style="font-size:1.1rem;font-weight:700;color:var(--accent3);margin-bottom:6px;">Mechanical Energy</div>
+      <div style="color:var(--text-dim);font-size:0.88rem;">دوران + حركة + قوة ميكانيكية</div>
+    </div>
+    <div class="card" style="text-align:center;padding:28px 20px;display:flex;align-items:center;justify-content:center;">
+      <div style="font-size:2rem;color:var(--accent);animation:pulse-glow 1.5s infinite;">⟶</div>
+    </div>
+    <div class="card" style="text-align:center;padding:28px 20px;">
+      <div style="font-size:2.5rem;margin-bottom:10px;">⚡</div>
+      <div style="font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:6px;">Electrical Energy</div>
+      <div style="color:var(--text-dim);font-size:0.88rem;">EMF + Current + Voltage</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">المبدأ الأساسي: Electromagnetic Induction</h3>
+    <p class="body-text">
+      لما الـ <span class="highlight">Magnetic Flux (Φ)</span> اللي بيعدي من الـ coil بيتغير،
+      بيتولد <span class="highlight">Induced EMF</span>. ده هو قانون <span class="highlight2">Faraday</span>.
+    </p>
+    <div class="formula-box">
+      E = –N × (ΔΦ / Δt)
+      <span class="formula-label">حيث N = عدد لفات الـ coil، Φ = Magnetic Flux</span>
+    </div>
+    <p class="body-text">
+      لو الـ coil بتتدور بسرعة زاوية ثابتة <span class="highlight">ω (angular velocity)</span>،
+      الـ EMF بيبقى على شكل <span class="highlight3">Sine Wave</span> – عشان كده بيتسمى
+      <span class="highlight">Alternating Current (AC)</span>.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">نوعين من الـ Generator</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div style="background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.25);border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:1.8rem;margin-bottom:6px;">〜</div>
+        <div style="color:var(--accent);font-weight:700;font-size:1rem;">AC Generator</div>
+        <div style="color:var(--text-dim);font-size:0.82rem;margin-top:6px;">Alternating Current<br>بيستخدم Slip Rings</div>
+      </div>
+      <div style="background:rgba(123,47,255,0.07);border:1px solid rgba(123,47,255,0.25);border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:1.8rem;margin-bottom:6px;">⊢</div>
+        <div style="color:var(--accent2);font-weight:700;font-size:1rem;">DC Generator</div>
+        <div style="color:var(--text-dim);font-size:0.82rem;margin-top:6px;">Direct Current<br>بيستخدم Commutator</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 2 – AC GENERATOR SIMULATION -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s2" class="section">
+  <h2 class="section-title">〜 AC Generator – Simulation تفاعلي</h2>
+
+  <div class="card-glow">
+    <h3 class="card-title">الـ Coil بيدور جوه الـ Magnetic Field</h3>
+    <p class="body-text">
+      شوف ازاي الـ <span class="highlight">coil</span> لما بيتدور جوه الـ
+      <span class="highlight3">magnetic field</span>، بيتغير الـ
+      <span class="highlight2">magnetic flux (Φ)</span> وبيتولد
+      <span class="highlight">induced EMF</span> على شكل <span class="highlight3">sine wave</span>.
+    </p>
+
+    <div class="sim-controls">
+      <button class="btn btn-start" onclick="startAC()">▶ Start Simulation</button>
+      <button class="btn btn-pause" onclick="pauseAC()">⏸ Pause</button>
+      <button class="btn btn-reset" onclick="resetAC()">↺ Reset</button>
+    </div>
+
+    <div class="slider-wrap" style="margin-bottom:14px;">
+      <label>Speed (ω):</label>
+      <input type="range" id="acSpeed" min="0.5" max="4" step="0.1" value="1.5" oninput="updateACSpeed(this)">
+      <span class="slider-val" id="acSpeedVal">1.5 rad/s</span>
+    </div>
+
+    <div class="canvas-wrap">
+      <div>
+        <canvas id="acGenCanvas" width="340" height="300" style="background:#080f1e;"></canvas>
+        <div class="canvas-label">الـ Coil بيتدور جوه الـ Magnetic Field</div>
+      </div>
+      <div>
+        <canvas id="acGraphCanvas" width="380" height="300" style="background:#080f1e;"></canvas>
+        <div class="canvas-label">EMF vs Time – Sine Wave Graph</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <div class="info-badge">🔄 Angle: <span id="acAngle">0°</span></div>
+        <div class="info-badge">⚡ EMF: <span id="acEMF">0.00 V</span></div>
+        <div class="info-badge">📐 Flux Φ: <span id="acFlux">Max</span></div>
+        <div class="info-badge">↩ Current: <span id="acCurrent">Zero</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">معادلة الـ EMF</h3>
+    <div class="formula-box">
+      E = Emax × sin(ωt)
+      <span class="formula-label">E = الـ EMF اللحظي | Emax = أقصى قيمة | ω = Angular Velocity | t = الزمن</span>
+    </div>
+    <div class="formula-box" style="border-color:rgba(123,47,255,0.3);color:var(--accent2);">
+      Emax = N × B × A × ω
+      <span class="formula-label">N = عدد اللفات | B = شدة الـ Magnetic Field | A = مساحة الـ coil</span>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent);"></div>EMF (Sine Wave)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--yellow);"></div>Emax</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent2);"></div>–Emax</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 3 – FARADAY'S LAW -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s3" class="section">
+  <h2 class="section-title">📐 Faraday's Law & Magnetic Flux</h2>
+
+  <div class="card-glow">
+    <h3 class="card-title">أولاً: الـ Magnetic Flux (Φ)</h3>
+    <p class="body-text">
+      الـ <span class="highlight">Magnetic Flux (Φ)</span> هو مقدار خطوط الـ magnetic field اللي بتعدي خلال
+      مساحة الـ coil. بيتقاس بـ <span class="highlight3">Weber (Wb)</span>.
+    </p>
+    <div class="formula-box">
+      Φ = B × A × cos(θ)
+      <span class="formula-label">B = Magnetic Field Intensity | A = مساحة الـ Coil | θ = الزاوية بين B وعمود السطح</span>
+    </div>
+    <p class="body-text">
+      لما الـ coil بيبقى <strong style="color:var(--accent);">عمودي</strong> على الـ magnetic field (θ = 0°):
+      الـ Flux بيكون <span class="highlight3">Maximum</span><br>
+      لما الـ coil بيبقى <strong style="color:var(--red);">موازي</strong> للـ magnetic field (θ = 90°):
+      الـ Flux بيكون <span class="highlight3">Zero</span>
+    </p>
+  </div>
+
+  <div class="card-glow" style="border-color:rgba(123,47,255,0.3);">
+    <h3 class="card-title">ثانياً: قانون Faraday</h3>
+    <p class="body-text">
+      قانون <span class="highlight2">Faraday</span> بيقول إن الـ <span class="highlight">Induced EMF</span>
+      بيساوي معدل تغير الـ <span class="highlight">Magnetic Flux</span> بالنسبة للزمن.
+    </p>
+    <div class="formula-box" style="border-color:rgba(123,47,255,0.3);color:var(--accent2);">
+      E = –N × (dΦ/dt)
+      <span class="formula-label">الإشارة السالبة معناها إن الـ current المتولد بيقاوم التغيير (Lenz's Law)</span>
+    </div>
+
+    <h3 class="card-title" style="margin-top:18px;">ثالثاً: قانون Lenz</h3>
+    <p class="body-text">
+      قانون <span class="highlight3">Lenz</span> بيكمّل Faraday: اتجاه الـ <span class="highlight">Induced Current</span>
+      بيكون دايماً بالشكل اللي يقاوم التغيير في الـ Magnetic Flux اللي سببه.
+      ده معناه الطاقة محفوظة (Conservation of Energy).
+    </p>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">ليه الـ EMF بيبقى Sinusoidal؟</h3>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;border-right:3px solid var(--accent);">
+        <span class="step-num">خطوة 1</span>
+        <span style="margin-right:8px;font-size:0.9rem;">الـ coil بيتدور بزاوية θ = ωt عن الوضع الابتدائي</span>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;border-right:3px solid var(--accent2);">
+        <span class="step-num">خطوة 2</span>
+        <span style="margin-right:8px;font-size:0.9rem;">الـ Flux: Φ = N × B × A × cos(ωt)</span>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;border-right:3px solid var(--yellow);">
+        <span class="step-num">خطوة 3</span>
+        <span style="margin-right:8px;font-size:0.9rem;">بنطبق Faraday: E = –dΦ/dt = N × B × A × ω × sin(ωt)</span>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;border-right:3px solid var(--green);">
+        <span class="step-num">خطوة 4</span>
+        <span style="margin-right:8px;font-size:0.9rem;">النتيجة: E = Emax × sin(ωt) – دا الـ Sine Wave!</span>
+      </div>
+    </div>
+
+    <div class="formula-box" style="margin-top:16px;">
+      Emax = N × B × A × ω
+      <span class="formula-label">أقصى قيمة للـ EMF لما الـ coil يكون موازي للـ magnetic field</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 4 – ROTATION ANGLES -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s4" class="section">
+  <h2 class="section-title">🔄 Rotation Angles – تفصيل كامل</h2>
+
+  <p class="body-text" style="margin-bottom:16px;">
+    إضغط على أي زاوية عشان تشوف حالة الـ <span class="highlight">EMF</span> والـ <span class="highlight2">Current</span> والـ <span class="highlight3">Flux</span>.
+  </p>
+
+  <div class="angle-grid" id="angleGrid">
+    <div class="angle-card active-angle" onclick="selectAngle(0)">
+      <div class="angle-deg">0°</div>
+      <div class="angle-info">Flux = Max<br>EMF = Zero</div>
+    </div>
+    <div class="angle-card" onclick="selectAngle(90)">
+      <div class="angle-deg">90°</div>
+      <div class="angle-info">Flux = Zero<br>EMF = Max</div>
+    </div>
+    <div class="angle-card" onclick="selectAngle(180)">
+      <div class="angle-deg">180°</div>
+      <div class="angle-info">Flux = –Max<br>EMF = Zero</div>
+    </div>
+    <div class="angle-card" onclick="selectAngle(270)">
+      <div class="angle-deg">270°</div>
+      <div class="angle-info">Flux = Zero<br>EMF = –Max</div>
+    </div>
+    <div class="angle-card" onclick="selectAngle(360)">
+      <div class="angle-deg">360°</div>
+      <div class="angle-info">Flux = Max<br>EMF = Zero</div>
+    </div>
+  </div>
+
+  <div class="card-glow" id="angleDetail">
+    <canvas id="angleCanvas" width="340" height="260" style="background:#080f1e;display:block;margin:0 auto 12px;border-radius:10px;"></canvas>
+    <div id="angleExplain" style="text-align:center;"></div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">ملخص الزوايا</h3>
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>الزاوية θ</th>
+          <th>Magnetic Flux (Φ)</th>
+          <th>Induced EMF</th>
+          <th>Current Direction</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="color:var(--accent);font-weight:700;">0°</td>
+          <td>ΦMax (أكبر ما يكون)</td>
+          <td style="color:var(--red);">Zero (صفر)</td>
+          <td>لا يوجد تيار</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent);font-weight:700;">90°</td>
+          <td>Zero (صفر)</td>
+          <td style="color:var(--green);">+Emax (أكبر موجب)</td>
+          <td>من a إلى b (في الـ coil)</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent);font-weight:700;">180°</td>
+          <td>–ΦMax</td>
+          <td style="color:var(--red);">Zero (صفر)</td>
+          <td>لا يوجد تيار</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent);font-weight:700;">270°</td>
+          <td>Zero (صفر)</td>
+          <td style="color:var(--red);">–Emax (أكبر سالب)</td>
+          <td>من b إلى a (عكس الاتجاه)</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent);font-weight:700;">360°</td>
+          <td>ΦMax (يرجع)</td>
+          <td style="color:var(--red);">Zero (صفر)</td>
+          <td>لا يوجد تيار</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 5 – COMPONENTS -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s5" class="section">
+  <h2 class="section-title">🔩 المكونات الداخلية للـ AC Generator</h2>
+
+  <div class="card-glow">
+    <h3 class="card-title">رسم تفاعلي للـ Generator</h3>
+    <canvas id="compCanvas" width="480" height="300" style="background:#080f1e;display:block;margin:0 auto 16px;border-radius:12px;width:100%;max-width:480px;"></canvas>
+    <p class="body-text" style="text-align:center;font-size:0.85rem;color:var(--text-dim);">
+      اضغط على أي مكوّن عشان تشوف شرحه
+    </p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div class="component-item" onclick="highlightComp('coil')">
+      <div class="comp-icon" style="background:rgba(0,212,255,0.1);">🔁</div>
+      <div>
+        <div class="comp-name">الـ Coil (الملف)</div>
+        <div class="comp-desc">
+          ده قلب الـ generator. عبارة عن سلك موصّل (conductor) ملفوف لفات كتير حوالين إطار.
+          لما بيتدور، بيتولد فيه <span style="color:var(--accent);">Induced EMF</span>.
+          كل ما زادت عدد اللفات (N)، كل ما زاد الـ EMF.
+        </div>
+      </div>
+    </div>
+
+    <div class="component-item" onclick="highlightComp('magnet')">
+      <div class="comp-icon" style="background:rgba(255,107,53,0.1);">🧲</div>
+      <div>
+        <div class="comp-name">الـ Magnet (المغناطيس)</div>
+        <div class="comp-desc">
+          بيعمل <span style="color:var(--accent3);">Magnetic Field (B)</span> ثابت.
+          ممكن يكون <span style="color:var(--accent);">Permanent Magnet</span> أو
+          <span style="color:var(--accent2);">Electromagnet</span>.
+          كل ما كان B أقوى، كل ما زاد الـ EMF.
+        </div>
+      </div>
+    </div>
+
+    <div class="component-item" onclick="highlightComp('slipring')">
+      <div class="comp-icon" style="background:rgba(0,255,136,0.1);">💍</div>
+      <div>
+        <div class="comp-name">الـ Slip Rings (الحلقات المنزلقة)</div>
+        <div class="comp-desc">
+          حلقتين دائريتين من النحاس، بتتدوروا مع الـ coil.
+          الوظيفة: نقل الـ current من الـ coil الدوّار للدائرة الخارجية.
+          لأنهم دائريين، التيار بيطلع <span style="color:var(--accent);">Alternating (AC)</span> – بيتغير اتجاهه.
+        </div>
+      </div>
+    </div>
+
+    <div class="component-item" onclick="highlightComp('brush')">
+      <div class="comp-icon" style="background:rgba(255,215,0,0.1);">🖊️</div>
+      <div>
+        <div class="comp-name">الـ Brushes (الفراشات)</div>
+        <div class="comp-desc">
+          قطعتين ثابتتين من الكربون (أو النحاس) بتلمسوا الـ slip rings.
+          الوظيفة: توصيل التيار من الـ slip rings للدائرة الخارجية
+          من غير ما تعيق الدوران.
+        </div>
+      </div>
+    </div>
+
+    <div class="component-item" onclick="highlightComp('axle')">
+      <div class="comp-icon" style="background:rgba(123,47,255,0.1);">⚙️</div>
+      <div>
+        <div class="comp-name">الـ Axle / Shaft (المحور)</div>
+        <div class="comp-desc">
+          المحور اللي بيتدور عليه الـ coil. بيتشغّل بطاقة ميكانيكية:
+          ممكن من turbine بخارية، أو من ماء (hydroelectric)، أو من wind turbine.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 6 – DC GENERATOR -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s6" class="section">
+  <h2 class="section-title">⊢ DC Generator – التيار المستمر</h2>
+
+  <div class="card-glow">
+    <h3 class="card-title">الفرق الوحيد: Commutator بدل Slip Rings</h3>
+    <p class="body-text">
+      الـ <span class="highlight">DC Generator</span> شبه الـ AC تماماً، الفرق الوحيد إنك بتستبدل
+      الـ <span class="highlight2">Slip Rings</span> بـ
+      <span class="highlight">Split Ring Commutator</span>.
+    </p>
+    <p class="body-text">
+      الـ <span class="highlight3">Commutator</span> عبارة عن حلقة مقسومة لنصفين.
+      كل نص دورة، الاتصال بيتعكس – فالتيار اللي جوه الـ coil بيتعكس،
+      لكن في الدائرة الخارجية بيظهر دايماً في نفس الاتجاه!
+    </p>
+
+    <div class="sim-controls">
+      <button class="btn btn-start" onclick="startDC()">▶ Start DC Simulation</button>
+      <button class="btn btn-pause" onclick="pauseDC()">⏸ Pause</button>
+      <button class="btn btn-reset" onclick="resetDC()">↺ Reset</button>
+    </div>
+
+    <div class="slider-wrap" style="margin-bottom:14px;">
+      <label>Speed (ω):</label>
+      <input type="range" id="dcSpeed" min="0.5" max="4" step="0.1" value="1.5" oninput="updateDCSpeed(this)">
+      <span class="slider-val" id="dcSpeedVal">1.5 rad/s</span>
+    </div>
+
+    <div class="canvas-wrap">
+      <div>
+        <canvas id="dcGenCanvas" width="340" height="300" style="background:#080f1e;"></canvas>
+        <div class="canvas-label">DC Generator مع الـ Commutator</div>
+      </div>
+      <div>
+        <canvas id="dcGraphCanvas" width="380" height="300" style="background:#080f1e;"></canvas>
+        <div class="canvas-label">Pulsating DC – الناتج الخارجي</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <div class="info-badge">🔄 Angle: <span id="dcAngle">0°</span></div>
+        <div class="info-badge" style="border-color:rgba(123,47,255,0.3);color:var(--accent2);">⚡ DC Output: <span id="dcEMF">0.00 V</span></div>
+        <div class="info-badge" style="border-color:rgba(0,255,136,0.3);color:var(--green);">📊 Type: Pulsating DC</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">ازاي الـ Commutator بيشتغل؟</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;border-right:3px solid var(--accent);">
+        <strong style="color:var(--accent);">النص الأول (0° → 180°):</strong>
+        <p class="body-text" style="margin:6px 0 0;">
+          الـ brush الأول بيلمس النصف الأول من الـ commutator. التيار بيطلع في اتجاه معين.
+        </p>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;border-right:3px solid var(--accent2);">
+        <strong style="color:var(--accent2);">النص التاني (180° → 360°):</strong>
+        <p class="body-text" style="margin:6px 0 0;">
+          التيار جوه الـ coil اتعكس، لكن الـ commutator كمان اتعكس –
+          فالـ brush الأول دلوقتي بيلمس النصف التاني. النتيجة: التيار بره الجهاز في نفس الاتجاه!
+        </p>
+      </div>
+    </div>
+    <div class="formula-box" style="margin-top:16px;">
+      Pulsating DC = |Emax × sin(ωt)|
+      <span class="formula-label">القيمة المطلقة بتخلي الناتج موجب دايماً</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 7 – TYPES OF EMF + CALCULATOR -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s7" class="section">
+  <h2 class="section-title">⚡ Types of EMF + آلة حاسبة</h2>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:20px;">
+    <div class="card" style="border-color:rgba(0,212,255,0.25);">
+      <div style="color:var(--accent);font-size:1.1rem;font-weight:700;margin-bottom:8px;">① Instantaneous EMF</div>
+      <div class="formula-box" style="font-size:1rem;padding:10px;">E = Emax × sin(ωt)</div>
+      <p class="body-text" style="font-size:0.85rem;">القيمة اللحظية للـ EMF عند زمن معين t.</p>
+    </div>
+    <div class="card" style="border-color:rgba(255,215,0,0.25);">
+      <div style="color:var(--yellow);font-size:1.1rem;font-weight:700;margin-bottom:8px;">② Maximum EMF</div>
+      <div class="formula-box" style="font-size:1rem;padding:10px;border-color:rgba(255,215,0,0.3);color:var(--yellow);">Emax = N·B·A·ω</div>
+      <p class="body-text" style="font-size:0.85rem;">أكبر قيمة يوصلها الـ EMF لما θ = 90° أو 270°.</p>
+    </div>
+    <div class="card" style="border-color:rgba(0,255,136,0.25);">
+      <div style="color:var(--green);font-size:1.1rem;font-weight:700;margin-bottom:8px;">③ RMS EMF (Effective)</div>
+      <div class="formula-box" style="font-size:1rem;padding:10px;border-color:rgba(0,255,136,0.3);color:var(--green);">Erms = Emax / √2</div>
+      <p class="body-text" style="font-size:0.85rem;">القيمة الفعّالة – اللي بتقيسها الآلات العادية. دايماً ≈ 0.707 × Emax.</p>
+    </div>
+    <div class="card" style="border-color:rgba(123,47,255,0.25);">
+      <div style="color:var(--accent2);font-size:1.1rem;font-weight:700;margin-bottom:8px;">④ Average EMF</div>
+      <div class="formula-box" style="font-size:1rem;padding:10px;border-color:rgba(123,47,255,0.3);color:var(--accent2);">Eavg = 2·Emax / π</div>
+      <p class="body-text" style="font-size:0.85rem;">المتوسط على نص الدورة (Half Cycle). ≈ 0.637 × Emax.</p>
+    </div>
+  </div>
+
+  <div class="card-glow">
+    <h3 class="card-title">🧮 EMF Calculator – آلة حاسبة تفاعلية</h3>
+    <div class="calc-grid">
+      <div class="calc-field">
+        <label>N – عدد اللفات (turns)</label>
+        <input type="number" id="calcN" placeholder="مثال: 100" min="1">
+      </div>
+      <div class="calc-field">
+        <label>B – Magnetic Field (Tesla)</label>
+        <input type="number" id="calcB" placeholder="مثال: 0.5" step="0.01" min="0">
+      </div>
+      <div class="calc-field">
+        <label>A – مساحة الـ Coil (m²)</label>
+        <input type="number" id="calcA" placeholder="مثال: 0.02" step="0.001" min="0">
+      </div>
+      <div class="calc-field">
+        <label>ω – Angular Velocity (rad/s)</label>
+        <input type="number" id="calcW" placeholder="مثال: 314" min="0">
+      </div>
+      <div class="calc-field">
+        <label>t – الزمن (s) لـ Instantaneous</label>
+        <input type="number" id="calcT" placeholder="مثال: 0.01" step="0.001" min="0">
+      </div>
+    </div>
+    <button class="btn btn-start" style="margin-top:8px;" onclick="calculate()">احسب ⚡</button>
+
+    <div class="calc-result" id="calcResult">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;">
+        <div style="text-align:center;">
+          <div style="color:var(--text-dim);font-size:0.8rem;">Emax</div>
+          <div class="res-val" id="resEmax">–</div>
+          <div style="color:var(--text-dim);font-size:0.75rem;">Volt</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="color:var(--text-dim);font-size:0.8rem;">Erms</div>
+          <div class="res-val" style="color:var(--accent);" id="resErms">–</div>
+          <div style="color:var(--text-dim);font-size:0.75rem;">Volt</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="color:var(--text-dim);font-size:0.8rem;">Eavg (half cycle)</div>
+          <div class="res-val" style="color:var(--accent2);" id="resEavg">–</div>
+          <div style="color:var(--text-dim);font-size:0.75rem;">Volt</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="color:var(--text-dim);font-size:0.8rem;">E instantaneous</div>
+          <div class="res-val" style="color:var(--yellow);" id="resEinst">–</div>
+          <div style="color:var(--text-dim);font-size:0.75rem;">Volt</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">العلاقات المهمة</h3>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">
+      <div class="formula-box" style="flex:1;min-width:200px;">Erms = Emax / √2 ≈ 0.707 Emax</div>
+      <div class="formula-box" style="flex:1;min-width:200px;border-color:rgba(123,47,255,0.3);color:var(--accent2);">Eavg = 2Emax / π ≈ 0.637 Emax</div>
+      <div class="formula-box" style="flex:1;min-width:200px;border-color:rgba(255,215,0,0.3);color:var(--yellow);">Erms = π/(2√2) × Eavg ≈ 1.11 Eavg</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 8 – PROBLEM SOLVING -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s8" class="section">
+  <h2 class="section-title">📝 Problem Solving – مسائل محلولة</h2>
+
+  <!-- Problem 1 -->
+  <div class="problem-card">
+    <div class="problem-number">مسألة ١</div>
+    <h3 class="card-title">حساب الـ EMF</h3>
+    <p class="body-text">
+      generator عنده coil مكونة من <strong>200 لفة (N=200)</strong>، مساحتها
+      <strong>0.05 m²</strong>، بتتدور جوه magnetic field شدته
+      <strong>B = 0.8 T</strong>، بسرعة زاوية <strong>ω = 100π rad/s</strong>.
+      احسب: (أ) Emax، (ب) Erms، (ج) قيمة E عند t = 0.005s.
+    </p>
+    <button class="btn btn-show" onclick="toggleSolution('sol1')">👁 إظهار الحل</button>
+    <div class="solution-box" id="sol1">
+      <div class="solution-step">
+        <div class="step-num">أ</div>
+        <div>
+          <strong style="color:var(--accent);">Emax = N × B × A × ω</strong><br>
+          Emax = 200 × 0.8 × 0.05 × 100π<br>
+          Emax = 200 × 0.8 × 0.05 × 314.16<br>
+          <span style="color:var(--green);font-size:1.1rem;font-weight:700;">Emax = 2513.3 V ≈ 2513 V</span>
+        </div>
+      </div>
+      <div class="solution-step">
+        <div class="step-num">ب</div>
+        <div>
+          <strong style="color:var(--accent2);">Erms = Emax / √2</strong><br>
+          Erms = 2513.3 / 1.414<br>
+          <span style="color:var(--green);font-size:1.1rem;font-weight:700;">Erms ≈ 1777 V</span>
+        </div>
+      </div>
+      <div class="solution-step">
+        <div class="step-num">ج</div>
+        <div>
+          <strong style="color:var(--yellow);">E = Emax × sin(ωt)</strong><br>
+          E = 2513.3 × sin(100π × 0.005)<br>
+          E = 2513.3 × sin(0.5π) = 2513.3 × sin(90°)<br>
+          <span style="color:var(--green);font-size:1.1rem;font-weight:700;">E = 2513.3 V (maximum!)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Problem 2 -->
+  <div class="problem-card">
+    <div class="problem-number">مسألة ٢</div>
+    <h3 class="card-title">حساب سرعة الدوران</h3>
+    <p class="body-text">
+      generator بيولّد <strong>Erms = 220 V</strong>. الـ coil عندها
+      <strong>N = 500 لفة</strong>، <strong>B = 0.1 T</strong>، <strong>A = 0.04 m²</strong>.
+      احسب: (أ) Emax، (ب) ω، (ج) التردد f.
+    </p>
+    <button class="btn btn-show" onclick="toggleSolution('sol2')">👁 إظهار الحل</button>
+    <div class="solution-box" id="sol2">
+      <div class="solution-step">
+        <div class="step-num">أ</div>
+        <div>
+          <strong style="color:var(--accent);">Emax = Erms × √2</strong><br>
+          Emax = 220 × 1.414<br>
+          <span style="color:var(--green);font-size:1.1rem;font-weight:700;">Emax = 311.1 V</span>
+        </div>
+      </div>
+      <div class="solution-step">
+        <div class="step-num">ب</div>
+        <div>
+          <strong style="color:var(--accent2);">Emax = N × B × A × ω</strong><br>
+          ω = Emax / (N × B × A)<br>
+          ω = 311.1 / (500 × 0.1 × 0.04)<br>
+          ω = 311.1 / 2<br>
+          <span style="color:var(--green);font-size:1.1rem;font-weight:700;">ω = 155.5 rad/s</span>
+        </div>
+      </div>
+      <div class="solution-step">
+        <div class="step-num">ج</div>
+        <div>
+          <strong style="color:var(--yellow);">ω = 2πf → f = ω/(2π)</strong><br>
+          f = 155.5 / (2 × 3.14159)<br>
+          <span style="color:var(--green);font-size:1.1rem;font-weight:700;">f ≈ 24.75 Hz</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Problem 3 -->
+  <div class="problem-card">
+    <div class="problem-number">مسألة ٣</div>
+    <h3 class="card-title">تحويل RMS و Average</h3>
+    <p class="body-text">
+      generator بيولّد <strong>Emax = 160 V</strong>.
+      احسب: (أ) Erms، (ب) Eavg (half cycle)، (ج) E عند θ = 30°.
+    </p>
+    <button class="btn btn-show" onclick="toggleSolution('sol3')">👁 إظهار الحل</button>
+    <div class="solution-box" id="sol3">
+      <div class="solution-step">
+        <div class="step-num">أ</div>
+        <div>
+          <strong style="color:var(--accent);">Erms = Emax / √2</strong><br>
+          Erms = 160 / 1.4142<br>
+          <span style="color:var(--green);font-size:1.1rem;font-weight:700;">Erms = 113.1 V</span>
+        </div>
+      </div>
+      <div class="solution-step">
+        <div class="step-num">ب</div>
+        <div>
+          <strong style="color:var(--accent2);">Eavg = 2 × Emax / π</strong><br>
+          Eavg = 2 × 160 / 3.14159<br>
+          <span style="color:var(--green);font-size:1.1rem;font-weight:700;">Eavg = 101.86 V</span>
+        </div>
+      </div>
+      <div class="solution-step">
+        <div class="step-num">ج</div>
+        <div>
+          <strong style="color:var(--yellow);">E = Emax × sin(θ)</strong><br>
+          E = 160 × sin(30°) = 160 × 0.5<br>
+          <span style="color:var(--green);font-size:1.1rem;font-weight:700;">E = 80 V</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 9 – ELECTRON FLOW -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s9" class="section">
+  <h2 class="section-title">🔬 Deep Simulation – حركة الـ Electrons</h2>
+
+  <div class="card-glow">
+    <h3 class="card-title">الـ Electrons بيتحركوا جوه الـ Wire</h3>
+    <p class="body-text">
+      لما الـ conductor بيتحرك في الـ <span class="highlight3">magnetic field</span>،
+      الـ <span class="highlight">magnetic force (F)</span> بتأثر على الـ electrons الحرة
+      جوه الـ conductor وبتدفعهم في اتجاه معين. ده هو أصل الـ
+      <span class="highlight">Induced EMF</span>.
+    </p>
+    <p class="body-text">
+      الـ Force على كل electron: <span class="highlight3">F = qv × B</span>
+      (حيث q = شحنة الـ electron، v = سرعة الـ conductor، B = الـ magnetic field).
+    </p>
+
+    <div style="text-align:center;margin:16px 0;">
+      <canvas id="electronCanvas" width="480" height="320" style="background:#060d1a;border-radius:12px;border:1px solid var(--border);width:100%;max-width:480px;"></canvas>
+    </div>
+
+    <div class="sim-controls">
+      <button class="btn btn-start" onclick="startElectron()">▶ Start</button>
+      <button class="btn btn-pause" onclick="pauseElectron()">⏸ Pause</button>
+      <button class="btn btn-reset" onclick="resetElectron()">↺ Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">خطوات تولّد الـ Induced EMF</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;display:flex;gap:12px;align-items:flex-start;">
+        <div style="background:rgba(0,212,255,0.15);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;flex-shrink:0;">1</div>
+        <div>
+          <strong style="color:var(--accent);">Conductor بيتحرك في الـ Magnetic Field</strong>
+          <p class="body-text" style="margin:4px 0 0;font-size:0.88rem;">الـ coil بيتدور، كل ضلع فيه بيتحرك خلال الـ magnetic field (B).</p>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;display:flex;gap:12px;align-items:flex-start;">
+        <div style="background:rgba(255,107,53,0.15);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--accent3);font-weight:700;flex-shrink:0;">2</div>
+        <div>
+          <strong style="color:var(--accent3);">Magnetic Force بتأثر على الـ Free Electrons</strong>
+          <p class="body-text" style="margin:4px 0 0;font-size:0.88rem;">F = qv × B – الـ electrons بيتحركوا جوه الـ conductor.</p>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;display:flex;gap:12px;align-items:flex-start;">
+        <div style="background:rgba(0,255,136,0.15);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--green);font-weight:700;flex-shrink:0;">3</div>
+        <div>
+          <strong style="color:var(--green);">بيتكوّن فرق جهد (Potential Difference)</strong>
+          <p class="body-text" style="margin:4px 0 0;font-size:0.88rem;">الـ electrons بتتراكم في طرف والطرف التاني فيه نقص – ده هو الـ EMF.</p>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;display:flex;gap:12px;align-items:flex-start;">
+        <div style="background:rgba(123,47,255,0.15);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:var(--accent2);font-weight:700;flex-shrink:0;">4</div>
+        <div>
+          <strong style="color:var(--accent2);">Current بيسري في الدائرة الخارجية</strong>
+          <p class="body-text" style="margin:4px 0 0;font-size:0.88rem;">لو الدائرة مغلقة، بيجري تيار كهربي (اتجاه الـ current عكس اتجاه حركة الـ electrons).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 10 – COMPARISON -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s10" class="section">
+  <h2 class="section-title">📊 AC vs DC Generator – مقارنة شاملة</h2>
+
+  <div class="card-glow">
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>وجه المقارنة</th>
+          <th style="color:var(--accent);">AC Generator</th>
+          <th style="color:var(--accent2);">DC Generator</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>طريقة توصيل الـ Coil</strong></td>
+          <td>Slip Rings (حلقتين دائريتين)</td>
+          <td>Split Ring Commutator (حلقة مقسومة)</td>
+        </tr>
+        <tr>
+          <td><strong>نوع التيار الخارج</strong></td>
+          <td style="color:var(--accent);">Alternating Current (AC)</td>
+          <td style="color:var(--accent2);">Direct Current (DC) – Pulsating</td>
+        </tr>
+        <tr>
+          <td><strong>شكل الـ Waveform</strong></td>
+          <td>Sine Wave كاملة (موجبة وسالبة)</td>
+          <td>Pulsating DC (موجبة فقط)</td>
+        </tr>
+        <tr>
+          <td><strong>اتجاه التيار</strong></td>
+          <td>بيتغير كل نص دورة</td>
+          <td>ثابت الاتجاه دايماً</td>
+        </tr>
+        <tr>
+          <td><strong>التردد (Frequency)</strong></td>
+          <td>ثابت (50 Hz في مصر)</td>
+          <td>لا يوجد تردد (DC)</td>
+        </tr>
+        <tr>
+          <td><strong>الاستخدام</strong></td>
+          <td>الشبكة الكهربية، المنازل، المصانع</td>
+          <td>شحن البطاريات، الالكترونيات</td>
+        </tr>
+        <tr>
+          <td><strong>قابلية النقل</strong></td>
+          <td>ينقل لمسافات بعيدة بسهولة بالـ Transformer</td>
+          <td>صعب نقله لمسافات بعيدة</td>
+        </tr>
+        <tr>
+          <td><strong>الصيانة</strong></td>
+          <td>أسهل (الـ slip rings أبسط)</td>
+          <td>أصعب (الـ commutator بيحتاج صيانة أكتر)</td>
+        </tr>
+        <tr>
+          <td><strong>العلاقة Erms/Emax</strong></td>
+          <td>Erms = Emax/√2</td>
+          <td>لا ينطبق (DC مستمر)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card-glow" style="margin-top:16px;">
+    <h3 class="card-title">مقارنة الـ Waveforms</h3>
+    <canvas id="compareCanvas" width="600" height="200" style="background:#080f1e;border-radius:10px;display:block;margin:0 auto;width:100%;max-width:600px;"></canvas>
+    <div class="legend" style="justify-content:center;margin-top:10px;">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent);width:20px;"></div>AC Output (Sine Wave)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent2);width:20px;"></div>DC Output (Pulsating)</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- SECTION 11 – COMMON MISTAKES -->
+<!-- ══════════════════════════════════════════════ -->
+<div id="s11" class="section">
+  <h2 class="section-title">⚠️ الأخطاء الشائعة</h2>
+
+  <p class="body-text" style="margin-bottom:16px;">
+    دي أكتر الأخطاء اللي بيقع فيها الطلبة في موضوع الـ Generator – خليك عارفها عشان تتجنبها!
+  </p>
+
+  <div class="mistake-card">
+    <div class="mistake-icon">❌</div>
+    <div>
+      <strong style="color:var(--red);font-size:1rem;">الخطأ ١: الخلط بين اتجاه التيار والـ EMF</strong>
+      <p class="body-text" style="margin-top:6px;">
+        كتير من الطلبة بيفتكروا إن لما الـ EMF بيبقى صفر، معناه إن التيار صفر بالظبط.
+        ده صح، لكن المشكلة لما بيغلطوا في تحديد <span style="color:var(--red);">اتجاه</span> التيار.
+        <br><strong style="color:var(--green);">✅ الصح:</strong> استخدم قاعدة <span style="color:var(--accent);">Fleming's Right Hand Rule</span>
+        عشان تحدد اتجاه الـ induced current في الـ conductor.
+      </p>
+    </div>
+  </div>
+
+  <div class="mistake-card">
+    <div class="mistake-icon">❌</div>
+    <div>
+      <strong style="color:var(--red);font-size:1rem;">الخطأ ٢: سوء فهم الـ Magnetic Flux (Φ)</strong>
+      <p class="body-text" style="margin-top:6px;">
+        بعض الطلبة بيفتكروا إن الـ EMF بيكون أكبر ما يكون لما الـ Flux أكبر ما يكون.
+        ده غلط! الـ EMF بيعتمد على <span style="color:var(--red);">معدل تغيير</span> الـ Flux، مش قيمته.
+        <br><strong style="color:var(--green);">✅ الصح:</strong> لما Φ = Max (θ=0°)، معدل التغيير = صفر → EMF = صفر!
+        لما Φ = صفر (θ=90°)، معدل التغيير أكبر ما يكون → EMF = Emax!
+      </p>
+    </div>
+  </div>
+
+  <div class="mistake-card">
+    <div class="mistake-icon">❌</div>
+    <div>
+      <strong style="color:var(--red);font-size:1rem;">الخطأ ٣: الخلط بين Erms وEavg</strong>
+      <p class="body-text" style="margin-top:6px;">
+        الطلبة أحياناً بيستخدموا Erms وEavg بالتبادل وده غلط.
+        <br><strong style="color:var(--green);">✅ الصح:</strong>
+        Erms = Emax/√2 ≈ 0.707 Emax
+        | Eavg = 2×Emax/π ≈ 0.637 Emax
+        <br>الـ Erms هي القيمة الفعّالة اللي بتقيسها الأجهزة. الـ Eavg للنص الدورة فقط.
+      </p>
+    </div>
+  </div>
+
+  <div class="mistake-card">
+    <div class="mistake-icon">❌</div>
+    <div>
+      <strong style="color:var(--red);font-size:1rem;">الخطأ ٤: نسيان الـ N في المعادلة</strong>
+      <p class="body-text" style="margin-top:6px;">
+        بيحسبوا Emax = B × A × ω بدون ضرب في عدد اللفات N.
+        <br><strong style="color:var(--green);">✅ الصح:</strong> Emax = <span style="color:var(--accent);">N</span> × B × A × ω
+        – لازم تضرب في N عدد اللفات!
+      </p>
+    </div>
+  </div>
+
+  <div class="mistake-card">
+    <div class="mistake-icon">❌</div>
+    <div>
+      <strong style="color:var(--red);font-size:1rem;">الخطأ ٥: الخلط بين AC وDC في الـ Waveform</strong>
+      <p class="body-text" style="margin-top:6px;">
+        بعض الطلبة بيفتكروا إن الـ DC Generator بيطلع منه تيار ثابت تماماً (flat line).
+        <br><strong style="color:var(--green);">✅ الصح:</strong> الـ DC Generator بيطلع منه
+        <span style="color:var(--accent2);">Pulsating DC</span> – موجات موجبة بدون جزء سالب.
+        مش flat line. عشان تعمل flat line محتاج <span style="color:var(--accent);">Smoothing Capacitor</span>.
+      </p>
+    </div>
+  </div>
+
+  <div class="mistake-card">
+    <div class="mistake-icon">❌</div>
+    <div>
+      <strong style="color:var(--red);font-size:1rem;">الخطأ ٦: نسيان إشارة Lenz's Law</strong>
+      <p class="body-text" style="margin-top:6px;">
+        في معادلة Faraday: E = –N × dΦ/dt ← الإشارة السالبة مهمة!
+        بعض الطلبة بيكتبوها بدون إشارة سالبة.
+        <br><strong style="color:var(--green);">✅ الصح:</strong> الإشارة السالبة دي
+        <span style="color:var(--accent3);">Lenz's Law</span> – بتدل إن الـ induced EMF بيقاوم سبب تولّده.
+      </p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;background:rgba(0,255,136,0.04);border-color:rgba(0,255,136,0.2);">
+    <h3 class="card-title" style="color:var(--green);">✅ نصائح للامتحان</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+      <div class="info-badge" style="border-color:rgba(0,255,136,0.3);color:var(--green);">📝 ارسم الـ coil دايماً</div>
+      <div class="info-badge" style="border-color:rgba(0,255,136,0.3);color:var(--green);">🧲 حدد اتجاه B أول حاجة</div>
+      <div class="info-badge" style="border-color:rgba(0,255,136,0.3);color:var(--green);">✏️ اكتب كل المعطيات</div>
+      <div class="info-badge" style="border-color:rgba(0,255,136,0.3);color:var(--green);">🔢 تحقق من الوحدات</div>
+      <div class="info-badge" style="border-color:rgba(0,255,136,0.3);color:var(--green);">📐 Fleming's Right Hand Rule</div>
+      <div class="info-badge" style="border-color:rgba(0,255,136,0.3);color:var(--green);">⚡ Erms = Emax/√2</div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════
+function showSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+
+  // Init canvases when section shown
+  if (id === 's2') initACGen();
+  if (id === 's4') { initAngleCanvas(); drawAngleDetail(0); }
+  if (id === 's5') initComponents();
+  if (id === 's6') initDCGen();
+  if (id === 's9') initElectron();
+  if (id === 's10') drawCompareWave();
+}
+
+// ════════════════════════════════════════
+// AC GENERATOR SIMULATION
+// ════════════════════════════════════════
+let acAnim = null, acAngle = 0, acRunning = false, acOmega = 1.5;
+let acGraphData = [];
+const acCtx = () => document.getElementById('acGenCanvas').getContext('2d');
+const acGCtx = () => document.getElementById('acGraphCanvas').getContext('2d');
+
+function initACGen() {
+  if (!acRunning) drawACGenerator(0);
+  drawACGraph();
+}
+
+function startAC() {
+  if (acRunning) return;
+  acRunning = true;
+  function loop() {
+    if (!acRunning) return;
+    acAngle += acOmega * 0.025;
+    drawACGenerator(acAngle);
+    updateACInfo(acAngle);
+    acGraphData.push(Math.sin(acAngle));
+    if (acGraphData.length > 300) acGraphData.shift();
+    drawACGraph();
+    acAnim = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+function pauseAC() { acRunning = false; if (acAnim) cancelAnimationFrame(acAnim); }
+function resetAC() {
+  pauseAC(); acAngle = 0; acGraphData = [];
+  drawACGenerator(0); drawACGraph(); updateACInfo(0);
+}
+function updateACSpeed(el) {
+  acOmega = parseFloat(el.value);
+  document.getElementById('acSpeedVal').textContent = acOmega.toFixed(1) + ' rad/s';
+}
+
+function drawACGenerator(angle) {
+  const canvas = document.getElementById('acGenCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const cx = W / 2, cy = H / 2;
+
+  // Background glow
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 140);
+  bg.addColorStop(0, 'rgba(0,212,255,0.03)');
+  bg.addColorStop(1, 'transparent');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Magnetic field lines (vertical)
+  ctx.strokeStyle = 'rgba(255,170,0,0.3)';
+  ctx.setLineDash([4, 6]); ctx.lineWidth = 1;
+  for (let x = 60; x < W - 40; x += 30) {
+    ctx.beginPath(); ctx.moveTo(x, 30); ctx.lineTo(x, H - 30); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Magnets
+  // N pole (left)
+  const grad1 = ctx.createLinearGradient(20, 0, 80, 0);
+  grad1.addColorStop(0, '#1a4080'); grad1.addColorStop(1, '#2060c0');
+  ctx.fillStyle = grad1;
+  ctx.beginPath(); ctx.roundRect(15, cy - 55, 50, 110, 8); ctx.fill();
+  ctx.fillStyle = '#00d4ff'; ctx.font = 'bold 22px Cairo'; ctx.textAlign = 'center';
+  ctx.fillText('N', 40, cy + 8);
+
+  // S pole (right)
+  const grad2 = ctx.createLinearGradient(W - 80, 0, W - 20, 0);
+  grad2.addColorStop(0, '#801a1a'); grad2.addColorStop(1, '#400d0d');
+  ctx.fillStyle = grad2;
+  ctx.beginPath(); ctx.roundRect(W - 65, cy - 55, 50, 110, 8); ctx.fill();
+  ctx.fillStyle = '#ff3366'; ctx.fillText('S', W - 40, cy + 8);
+
+  // Field arrows
+  ctx.strokeStyle = 'rgba(255,170,0,0.5)'; ctx.lineWidth = 1.5;
+  for (let y = cy - 40; y <= cy + 40; y += 20) {
+    ctx.beginPath(); ctx.moveTo(75, y); ctx.lineTo(W - 75, y); ctx.stroke();
+    // Arrowhead
+    ctx.beginPath(); ctx.moveTo(W - 85, y - 5); ctx.lineTo(W - 75, y); ctx.lineTo(W - 85, y + 5); ctx.stroke();
+  }
+
+  // Rotating coil
+  const len = 70, wid = 45;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
+
+  // Coil glow
+  const emfVal = Math.abs(Math.sin(angle));
+  const glowColor = `rgba(0,212,255,${0.1 + emfVal * 0.4})`;
+  ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 8 + emfVal * 15;
+
+  // Draw coil as thick rectangle
+  ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.rect(-wid, -len, wid * 2, len * 2); ctx.stroke();
+
+  // Coil fill
+  ctx.fillStyle = `rgba(0,212,255,${0.05 + emfVal * 0.1})`;
+  ctx.fill();
+
+  // Current direction arrows on sides
+  const edir = Math.sin(angle) > 0 ? 1 : -1;
+  if (Math.abs(Math.sin(angle)) > 0.1) {
+    drawArrow(ctx, -wid, -len * 0.3, -wid, len * 0.3, edir > 0 ? '#00ff88' : '#ff3366', 2);
+    drawArrow(ctx, wid, len * 0.3, wid, -len * 0.3, edir > 0 ? '#00ff88' : '#ff3366', 2);
+  }
+
+  ctx.restore();
+  ctx.shadowBlur = 0;
+
+  // Axis
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
+  ctx.beginPath(); ctx.moveTo(cx, 20); ctx.lineTo(cx, H - 20); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Slip rings
+  ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(cx - 12, H - 30, 8, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx + 12, H - 30, 8, 0, Math.PI * 2); ctx.stroke();
+
+  // Brushes
+  ctx.fillStyle = '#888'; ctx.fillRect(cx - 22, H - 16, 6, 14);
+  ctx.fillRect(cx + 16, H - 16, 6, 14);
+
+  // Labels
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px Cairo'; ctx.textAlign = 'left';
+  ctx.fillText('Slip Rings', cx - 38, H - 6);
+  ctx.fillText('Brushes', cx + 26, H - 6);
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color, w) {
+  ctx.strokeStyle = color; ctx.lineWidth = w;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const len = 10;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - len * Math.cos(angle - 0.4), y2 - len * Math.sin(angle - 0.4));
+  ctx.lineTo(x2 - len * Math.cos(angle + 0.4), y2 - len * Math.sin(angle + 0.4));
+  ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+}
+
+function drawACGraph() {
+  const canvas = document.getElementById('acGraphCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 40, padR = 10, padT = 20, padB = 30;
+  const gW = W - padL - padR, gH = H - padT - padB;
+  const midY = padT + gH / 2;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  for (let y = padT; y <= padT + gH; y += gH / 4) {
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+  }
+  for (let x = padL; x <= W - padR; x += gW / 6) {
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + gH); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT + gH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(padL, midY); ctx.lineTo(W - padR, midY); ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '11px Cairo'; ctx.textAlign = 'right';
+  ctx.fillText('+E', padL - 2, padT + 8);
+  ctx.fillText('0', padL - 2, midY + 4);
+  ctx.fillText('–E', padL - 2, padT + gH - 2);
+
+  // Emax lines
+  ctx.strokeStyle = 'rgba(255,215,0,0.25)'; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(padL, padT + 8); ctx.lineTo(W - padR, padT + 8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(padL, padT + gH - 8); ctx.lineTo(W - padR, padT + gH - 8); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Sine wave (full)
+  ctx.strokeStyle = 'rgba(0,212,255,0.2)'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i <= gW; i++) {
+    const a = (i / gW) * Math.PI * 4;
+    const y = midY - Math.sin(a) * (gH / 2 - 12);
+    if (i === 0) ctx.moveTo(padL + i, y); else ctx.lineTo(padL + i, y);
+  }
+  ctx.stroke();
+
+  // Actual data
+  if (acGraphData.length > 1) {
+    const maxShow = Math.min(acGraphData.length, gW);
+    const data = acGraphData.slice(-maxShow);
+    const gradient = ctx.createLinearGradient(padL, 0, W - padR, 0);
+    gradient.addColorStop(0, 'rgba(0,212,255,0.3)');
+    gradient.addColorStop(1, '#00d4ff');
+    ctx.strokeStyle = gradient; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    data.forEach((v, i) => {
+      const x = padL + (i / maxShow) * gW;
+      const y = midY - v * (gH / 2 - 12);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Current point dot
+    const last = data[data.length - 1];
+    const dotX = padL + gW;
+    const dotY = midY - last * (gH / 2 - 12);
+    ctx.beginPath(); ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#00d4ff';
+    ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  // Axis labels
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '11px Cairo'; ctx.textAlign = 'center';
+  ctx.fillText('t (time)', W / 2, H - 5);
+  ctx.save(); ctx.translate(12, H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText('EMF (V)', 0, 0); ctx.restore();
+}
+
+function updateACInfo(angle) {
+  const emf = Math.sin(angle);
+  const deg = Math.round((angle % (2 * Math.PI)) * 180 / Math.PI);
+  document.getElementById('acAngle').textContent = deg + '°';
+  document.getElementById('acEMF').textContent = (emf * 100).toFixed(1) + ' V';
+  document.getElementById('acFlux').textContent = Math.cos(angle) > 0.5 ? 'High ↑' : Math.cos(angle) < -0.5 ? 'Low ↓' : 'Changing';
+  document.getElementById('acCurrent').textContent = emf > 0.1 ? '→ Positive' : emf < -0.1 ? '← Negative' : 'Zero';
+}
+
+// ════════════════════════════════════════
+// ANGLE DETAIL CANVAS
+// ════════════════════════════════════════
+let selectedAngle = 0;
+
+function selectAngle(deg) {
+  selectedAngle = deg;
+  document.querySelectorAll('.angle-card').forEach((c, i) => {
+    c.classList.toggle('active-angle', [0, 90, 180, 270, 360][i] === deg);
+  });
+  drawAngleDetail(deg);
+}
+
+function initAngleCanvas() { drawAngleDetail(0); }
+
+function drawAngleDetail(deg) {
+  const canvas = document.getElementById('angleCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2 - 30, cy = H / 2;
+  const angle = deg * Math.PI / 180;
+  const emf = Math.sin(angle);
+  const flux = Math.cos(angle);
+
+  // Magnet poles
+  ctx.fillStyle = '#1a3070'; ctx.beginPath(); ctx.roundRect(20, cy - 50, 40, 100, 6); ctx.fill();
+  ctx.fillStyle = '#00d4ff'; ctx.font = 'bold 18px Cairo'; ctx.textAlign = 'center'; ctx.fillText('N', 40, cy + 6);
+  ctx.fillStyle = '#601010'; ctx.beginPath(); ctx.roundRect(W - 80, cy - 50, 40, 100, 6); ctx.fill();
+  ctx.fillStyle = '#ff3366'; ctx.fillText('S', W - 60, cy + 6);
+
+  // Field arrows
+  ctx.strokeStyle = 'rgba(255,165,0,0.4)'; ctx.lineWidth = 1.5;
+  for (let y = cy - 30; y <= cy + 30; y += 20) {
+    ctx.beginPath(); ctx.moveTo(65, y); ctx.lineTo(W - 85, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W - 92, y - 5); ctx.lineTo(W - 82, y); ctx.lineTo(W - 92, y + 5); ctx.stroke();
+  }
+
+  // Rotating coil
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
+  const emfAbs = Math.abs(emf);
+  ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 5 + emfAbs * 20;
+  ctx.strokeStyle = emfAbs > 0.5 ? '#00ff88' : '#00d4ff'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.rect(-35, -55, 70, 110); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // EMF direction arrows
+  if (emfAbs > 0.15) {
+    ctx.strokeStyle = emf > 0 ? '#00ff88' : '#ff3366'; ctx.lineWidth = 2;
+    const dir = emf > 0 ? 1 : -1;
+    drawArrow(ctx, -35, -20, -35, 20, emf > 0 ? '#00ff88' : '#ff3366', 2);
+    drawArrow(ctx, 35, 20, 35, -20, emf > 0 ? '#00ff88' : '#ff3366', 2);
+  }
+  ctx.restore();
+
+  // EMF indicator
+  const barW = 100, barH = 16;
+  const barX = W - 120, barY = 20;
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 4); ctx.fill();
+  const fillW = Math.abs(emf) * barW;
+  ctx.fillStyle = emf > 0 ? '#00ff88' : '#ff3366';
+  if (fillW > 0) { ctx.beginPath(); ctx.roundRect(barX, barY, fillW, barH, 4); ctx.fill(); }
+  ctx.fillStyle = '#fff'; ctx.font = '11px Cairo'; ctx.textAlign = 'center';
+  ctx.fillText('EMF = ' + (emf * 100).toFixed(0) + ' V', barX + barW / 2, barY + barH + 14);
+
+  // Angle label
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = 'bold 14px Cairo'; ctx.textAlign = 'left';
+  ctx.fillText('θ = ' + deg + '°', 70, 25);
+
+  // Info
+  const div = document.getElementById('angleExplain');
+  const infos = {
+    0: '<span style="color:#ffd700">الـ Coil عمودي على B</span> – Flux = <b style="color:#00d4ff">Maximum</b> – EMF = <b style="color:#ff3366">Zero</b> – لا يوجد تيار',
+    90: '<span style="color:#ffd700">الـ Coil موازي لـ B</span> – Flux = <b style="color:#ff3366">Zero</b> – EMF = <b style="color:#00ff88">+Maximum</b> – التيار من a إلى b',
+    180: '<span style="color:#ffd700">الـ Coil عمودي (عكس)</span> – Flux = <b style="color:#7b2fff">–Maximum</b> – EMF = <b style="color:#ff3366">Zero</b> – لا يوجد تيار',
+    270: '<span style="color:#ffd700">الـ Coil موازي (عكس)</span> – Flux = <b style="color:#ff3366">Zero</b> – EMF = <b style="color:#ff3366">–Maximum</b> – التيار من b إلى a',
+    360: '<span style="color:#ffd700">دورة كاملة (= 0°)</span> – Flux = <b style="color:#00d4ff">Maximum</b> – EMF = <b style="color:#ff3366">Zero</b> – نفس الحالة الأولى'
+  };
+  div.innerHTML = '<p style="font-size:0.9rem;color:#b0c8e0;line-height:1.8;">' + (infos[deg] || '') + '</p>';
+}
+
+// ════════════════════════════════════════
+// COMPONENTS CANVAS
+// ════════════════════════════════════════
+let compAngle = 0, compAnim = null;
+
+function initComponents() {
+  function loop() {
+    compAngle += 0.02;
+    drawComponentsCanvas();
+    compAnim = requestAnimationFrame(loop);
+  }
+  if (compAnim) cancelAnimationFrame(compAnim);
+  compAnim = requestAnimationFrame(loop);
+}
+
+function drawComponentsCanvas() {
+  const canvas = document.getElementById('compCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+
+  // North magnet
+  ctx.fillStyle = '#0d2060'; ctx.beginPath(); ctx.roundRect(20, cy - 55, 55, 110, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,212,255,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#00d4ff'; ctx.font = 'bold 20px Cairo'; ctx.textAlign = 'center';
+  ctx.fillText('N', 47, cy + 7);
+
+  // South magnet
+  ctx.fillStyle = '#601010'; ctx.beginPath(); ctx.roundRect(W - 75, cy - 55, 55, 110, 8); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,51,102,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#ff3366'; ctx.fillText('S', W - 47, cy + 7);
+
+  // Field lines
+  ctx.strokeStyle = 'rgba(255,165,0,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
+  for (let y = cy - 40; y <= cy + 40; y += 20) {
+    ctx.beginPath(); ctx.moveTo(78, y); ctx.lineTo(W - 78, y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Rotating coil
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(compAngle);
+  ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 4;
+  ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.rect(-40, -60, 80, 120); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Axle (center dot)
+  ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // Axle line
+  ctx.strokeStyle = 'rgba(255,215,0,0.5)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx, 15); ctx.lineTo(cx, H - 20); ctx.stroke();
+
+  // Slip rings (animated)
+  const r1 = 12, r2 = 8;
+  ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(cx - 15, H - 32, r1, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx + 15, H - 32, r1, 0, Math.PI * 2); ctx.stroke();
+
+  // Brushes
+  ctx.fillStyle = '#888888';
+  ctx.beginPath(); ctx.roundRect(cx - 28, H - 20, 8, 18, 2); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(cx + 20, H - 20, 8, 18, 2); ctx.fill();
+
+  // External circuit lines
+  ctx.strokeStyle = 'rgba(0,255,136,0.6)'; ctx.lineWidth = 2;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(cx - 28, H - 14); ctx.lineTo(20, H - 14); ctx.lineTo(20, H + 5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + 28, H - 14); ctx.lineTo(W - 20, H - 14); ctx.lineTo(W - 20, H + 5); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Resistor symbol
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+  ctx.strokeRect(cx - 20, H + 5, 40, 16);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '10px Cairo'; ctx.textAlign = 'center';
+  ctx.fillText('Load R', cx, H + 18);
+
+  // Labels
+  ctx.font = '11px Cairo'; ctx.fillStyle = 'rgba(0,212,255,0.7)';
+  ctx.fillText('Coil', cx + 55, cy - 40);
+  ctx.fillStyle = 'rgba(255,215,0,0.7)';
+  ctx.fillText('Slip Rings', cx + 35, H - 28);
+  ctx.fillStyle = 'rgba(180,180,180,0.7)';
+  ctx.fillText('Brushes', cx + 38, H - 10);
+}
+
+// ════════════════════════════════════════
+// DC GENERATOR
+// ════════════════════════════════════════
+let dcAnim = null, dcAngle = 0, dcRunning = false, dcOmega = 1.5;
+let dcGraphData = [];
+
+function initDCGen() {
+  if (!dcRunning) drawDCGenerator(0);
+  drawDCGraph();
+}
+
+function startDC() {
+  if (dcRunning) return;
+  dcRunning = true;
+  function loop() {
+    if (!dcRunning) return;
+    dcAngle += dcOmega * 0.025;
+    drawDCGenerator(dcAngle);
+    const rawEmf = Math.sin(dcAngle);
+    const dcEmf = Math.abs(rawEmf);
+    dcGraphData.push(dcEmf);
+    if (dcGraphData.length > 300) dcGraphData.shift();
+    drawDCGraph();
+    document.getElementById('dcAngle').textContent = Math.round((dcAngle % (2 * Math.PI)) * 180 / Math.PI) + '°';
+    document.getElementById('dcEMF').textContent = (dcEmf * 100).toFixed(1) + ' V';
+    dcAnim = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+function pauseDC() { dcRunning = false; if (dcAnim) cancelAnimationFrame(dcAnim); }
+function resetDC() {
+  pauseDC(); dcAngle = 0; dcGraphData = [];
+  drawDCGenerator(0); drawDCGraph();
+  document.getElementById('dcAngle').textContent = '0°';
+  document.getElementById('dcEMF').textContent = '0.00 V';
+}
+function updateDCSpeed(el) {
+  dcOmega = parseFloat(el.value);
+  document.getElementById('dcSpeedVal').textContent = dcOmega.toFixed(1) + ' rad/s';
+}
+
+function drawDCGenerator(angle) {
+  const canvas = document.getElementById('dcGenCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+
+  // Magnets
+  ctx.fillStyle = '#0d2060'; ctx.beginPath(); ctx.roundRect(15, cy - 55, 50, 110, 8); ctx.fill();
+  ctx.fillStyle = '#00d4ff'; ctx.font = 'bold 20px Cairo'; ctx.textAlign = 'center'; ctx.fillText('N', 40, cy + 7);
+  ctx.fillStyle = '#601010'; ctx.beginPath(); ctx.roundRect(W - 65, cy - 55, 50, 110, 8); ctx.fill();
+  ctx.fillStyle = '#ff3366'; ctx.fillText('S', W - 40, cy + 7);
+
+  // Field lines
+  ctx.strokeStyle = 'rgba(255,165,0,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([3,5]);
+  for (let y = cy-35; y<=cy+35; y+=18) {
+    ctx.beginPath(); ctx.moveTo(68,y); ctx.lineTo(W-68,y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Rotating coil
+  const emf = Math.sin(angle);
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
+  ctx.shadowColor = '#7b2fff'; ctx.shadowBlur = 8 + Math.abs(emf) * 15;
+  ctx.strokeStyle = '#7b2fff'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.rect(-38, -60, 76, 120); ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // Commutator (split ring)
+  const splitAngle = angle % (Math.PI);
+  ctx.save(); ctx.translate(cx, H - 32);
+  ctx.rotate(splitAngle);
+  // Half 1
+  ctx.strokeStyle = '#ff9900'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(0, 0, 13, 0.1, Math.PI - 0.1); ctx.stroke();
+  // Half 2
+  ctx.strokeStyle = '#ffcc00';
+  ctx.beginPath(); ctx.arc(0, 0, 13, Math.PI + 0.1, Math.PI * 2 - 0.1); ctx.stroke();
+  // Gap lines
+  ctx.strokeStyle = '#080f1e'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(-13.5, 0); ctx.lineTo(13.5, 0); ctx.stroke();
+  ctx.restore();
+
+  // Brushes (fixed)
+  ctx.fillStyle = '#aaaaaa';
+  ctx.fillRect(cx - 23, H - 18, 7, 16);
+  ctx.fillRect(cx + 16, H - 18, 7, 16);
+
+  // Label
+  ctx.fillStyle = 'rgba(255,153,0,0.8)'; ctx.font = '11px Cairo'; ctx.textAlign = 'center';
+  ctx.fillText('Commutator', cx, H - 4);
+  ctx.fillStyle = 'rgba(180,180,180,0.7)'; ctx.fillText('Brushes', cx + 50, H - 8);
+}
+
+function drawDCGraph() {
+  const canvas = document.getElementById('dcGraphCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const padL = 40, padR = 10, padT = 20, padB = 30;
+  const gW = W - padL - padR, gH = H - padT - padB;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  for (let y = padT; y <= padT + gH; y += gH / 4) {
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+  }
+  for (let x = padL; x <= W - padR; x += gW / 6) {
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + gH); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT + gH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(padL, padT + gH); ctx.lineTo(W - padR, padT + gH); ctx.stroke();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '11px Cairo'; ctx.textAlign = 'right';
+  ctx.fillText('+E', padL - 2, padT + 8);
+  ctx.fillText('0', padL - 2, padT + gH + 4);
+
+  // Reference full DC
+  ctx.strokeStyle = 'rgba(123,47,255,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  for (let i = 0; i <= gW; i++) {
+    const a = (i / gW) * Math.PI * 4;
+    const v = Math.abs(Math.sin(a));
+    const y = padT + gH - v * (gH - 12);
+    if (i === 0) ctx.moveTo(padL + i, y); else ctx.lineTo(padL + i, y);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Actual DC data
+  if (dcGraphData.length > 1) {
+    const maxShow = Math.min(dcGraphData.length, gW);
+    const data = dcGraphData.slice(-maxShow);
+    const gr = ctx.createLinearGradient(padL, 0, W - padR, 0);
+    gr.addColorStop(0, 'rgba(123,47,255,0.4)'); gr.addColorStop(1, '#7b2fff');
+    ctx.strokeStyle = gr; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    data.forEach((v, i) => {
+      const x = padL + (i / maxShow) * gW;
+      const y = padT + gH - v * (gH - 12);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    const last = data[data.length - 1];
+    ctx.beginPath(); ctx.arc(padL + gW, padT + gH - last * (gH - 12), 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#7b2fff'; ctx.shadowColor = '#7b2fff'; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '11px Cairo'; ctx.textAlign = 'center';
+  ctx.fillText('t (time)', W / 2, H - 5);
+}
+
+// ════════════════════════════════════════
+// CALCULATOR
+// ════════════════════════════════════════
+function calculate() {
+  const N = parseFloat(document.getElementById('calcN').value);
+  const B = parseFloat(document.getElementById('calcB').value);
+  const A = parseFloat(document.getElementById('calcA').value);
+  const w = parseFloat(document.getElementById('calcW').value);
+  const t = parseFloat(document.getElementById('calcT').value);
+
+  if (isNaN(N) || isNaN(B) || isNaN(A) || isNaN(w)) {
+    alert('من فضلك ادخل القيم N, B, A, ω على الأقل!'); return;
+  }
+
+  const Emax = N * B * A * w;
+  const Erms = Emax / Math.sqrt(2);
+  const Eavg = 2 * Emax / Math.PI;
+  const Einst = isNaN(t) ? null : Emax * Math.sin(w * t);
+
+  document.getElementById('resEmax').textContent = Emax.toFixed(2);
+  document.getElementById('resErms').textContent = Erms.toFixed(2);
+  document.getElementById('resEavg').textContent = Eavg.toFixed(2);
+  document.getElementById('resEinst').textContent = Einst !== null ? Einst.toFixed(2) : 'أدخل t';
+
+  const res = document.getElementById('calcResult');
+  res.style.display = 'block';
+  res.style.animation = 'none'; res.offsetHeight;
+  res.style.animation = 'fadeIn 0.4s ease';
+}
+
+// ════════════════════════════════════════
+// PROBLEM SOLUTIONS
+// ════════════════════════════════════════
+function toggleSolution(id) {
+  const el = document.getElementById(id);
+  if (el.style.display === 'block') { el.style.display = 'none'; }
+  else { el.style.display = 'block'; }
+}
+
+// ════════════════════════════════════════
+// ELECTRON FLOW SIMULATION
+// ════════════════════════════════════════
+let electronAnim = null, electronRunning = false;
+let electrons = [];
+let electronT = 0;
+
+function initElectron() {
+  electrons = [];
+  for (let i = 0; i < 12; i++) {
+    electrons.push({
+      pos: i / 12,
+      side: i < 6 ? 0 : 1,
+      size: 3 + Math.random() * 2,
+      alpha: 0.6 + Math.random() * 0.4
+    });
+  }
+  drawElectronCanvas();
+}
+
+function startElectron() {
+  if (electronRunning) return;
+  electronRunning = true;
+  function loop() {
+    if (!electronRunning) return;
+    electronT += 0.02;
+    drawElectronCanvas();
+    electronAnim = requestAnimationFrame(loop);
+  }
+  loop();
+}
+function pauseElectron() { electronRunning = false; if (electronAnim) cancelAnimationFrame(electronAnim); }
+function resetElectron() { pauseElectron(); electronT = 0; initElectron(); }
+
+function drawElectronCanvas() {
+  const canvas = document.getElementById('electronCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2;
+
+  // B field arrows (background)
+  ctx.strokeStyle = 'rgba(255,165,0,0.2)'; ctx.lineWidth = 1.5;
+  for (let x = 80; x < W - 60; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 30); ctx.lineTo(x, H - 30); ctx.stroke();
+    // Downward arrow
+    ctx.beginPath(); ctx.moveTo(x - 5, H - 38); ctx.lineTo(x, H - 28); ctx.lineTo(x + 5, H - 38); ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,165,0,0.4)'; ctx.font = '11px Cairo'; ctx.textAlign = 'left';
+  ctx.fillText('B →', W - 55, cy);
+
+  // Conductor wire (vertical)
+  const wireX = cx, wireTop = 40, wireBot = H - 40;
+
+  // Glow based on current magnitude
+  const emfNow = Math.sin(electronT);
+  const glow = Math.abs(emfNow);
+  ctx.shadowColor = glow > 0.1 ? '#00d4ff' : '#333';
+  ctx.shadowBlur = glow * 20;
+  ctx.strokeStyle = `rgba(0,212,255,${0.4 + glow * 0.5})`; ctx.lineWidth = 8;
+  ctx.beginPath(); ctx.moveTo(wireX, wireTop); ctx.lineTo(wireX, wireBot); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Conductor outline
+  ctx.strokeStyle = 'rgba(0,212,255,0.3)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(wireX - 12, wireTop, 24, wireBot - wireTop, 4); ctx.stroke();
+
+  // Electrons moving along wire
+  const dir = emfNow > 0 ? 1 : -1;
+  for (let i = 0; i < 10; i++) {
+    const basePos = (i / 10 + electronT * 0.3 * dir + 100) % 1;
+    const y = wireTop + basePos * (wireBot - wireTop);
+    const alpha = Math.abs(emfNow) > 0.05 ? 0.9 : 0.2;
+
+    // Electron glow
+    const eg = ctx.createRadialGradient(wireX, y, 0, wireX, y, 8);
+    eg.addColorStop(0, `rgba(0,150,255,${alpha})`);
+    eg.addColorStop(1, 'rgba(0,100,255,0)');
+    ctx.fillStyle = eg;
+    ctx.beginPath(); ctx.arc(wireX, y, 8, 0, Math.PI * 2); ctx.fill();
+
+    // Electron dot
+    ctx.fillStyle = `rgba(100,200,255,${alpha})`;
+    ctx.beginPath(); ctx.arc(wireX, y, 4, 0, Math.PI * 2); ctx.fill();
+
+    // Negative charge label
+    if (i % 3 === 0) {
+      ctx.fillStyle = `rgba(255,255,255,${alpha * 0.6})`;
+      ctx.font = 'bold 10px Cairo'; ctx.textAlign = 'left';
+      ctx.fillText('e⁻', wireX + 10, y + 4);
+    }
+  }
+
+  // Force arrow
+  if (Math.abs(emfNow) > 0.1) {
+    const arrowDir = emfNow > 0 ? -1 : 1;
+    ctx.fillStyle = '#ff6b35'; ctx.font = 'bold 12px Cairo'; ctx.textAlign = 'center';
+    ctx.fillText('F = qv×B', cx + 60, cy);
+    ctx.strokeStyle = '#ff6b35'; ctx.lineWidth = 2.5;
+    const ay = cy;
+    ctx.beginPath(); ctx.moveTo(cx + 20, ay); ctx.lineTo(cx + 50, ay); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 43, ay - 6); ctx.lineTo(cx + 50, ay); ctx.lineTo(cx + 43, ay + 6); ctx.fill();
+  }
+
+  // Velocity arrow (upward)
+  ctx.strokeStyle = 'rgba(0,255,136,0.7)'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(cx - 35, cy + 30); ctx.lineTo(cx - 35, cy - 30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx - 42, cy - 22); ctx.lineTo(cx - 35, cy - 30); ctx.lineTo(cx - 28, cy - 22); ctx.fill();
+  ctx.fillStyle = 'rgba(0,255,136,0.8)'; ctx.font = '12px Cairo'; ctx.textAlign = 'center';
+  ctx.fillText('v', cx - 35, cy + 44);
+
+  // EMF indicator
+  const barH = 16, barW = 80;
+  const barX = W - 100, barY = 20;
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 4); ctx.fill();
+  const fw = Math.abs(emfNow) * barW;
+  ctx.fillStyle = emfNow > 0 ? '#00ff88' : '#ff3366';
+  if (fw > 0) { ctx.beginPath(); ctx.roundRect(barX, barY, fw, barH, 4); ctx.fill(); }
+  ctx.fillStyle = '#fff'; ctx.font = '10px Cairo'; ctx.textAlign = 'center';
+  ctx.fillText('EMF = ' + (emfNow * 100).toFixed(0) + 'V', barX + barW / 2, barY + barH + 14);
+
+  // Labels
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px Cairo';
+  ctx.textAlign = 'center'; ctx.fillText('Conductor', wireX, wireTop - 10);
+  ctx.fillStyle = 'rgba(255,107,53,0.7)'; ctx.fillText('Magnetic Field (B)', W/2, H - 10);
+}
+
+// ════════════════════════════════════════
+// COMPARISON WAVEFORM
+// ════════════════════════════════════════
+function drawCompareWave() {
+  const canvas = document.getElementById('compareCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const padL = 40, padR = 10, padT = 10, padB = 20;
+  const gW = W - padL - padR, gH = (H - padT - padB) / 2 - 10;
+
+  function drawWave(yOff, label, color, isDC) {
+    const midY = yOff + gH / 2;
+    // Axis
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, midY); ctx.lineTo(W - padR, midY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(padL, yOff); ctx.lineTo(padL, yOff + gH); ctx.stroke();
+
+    // Zero line label
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = '10px Cairo'; ctx.textAlign = 'right';
+    ctx.fillText('0', padL - 3, midY + 4);
+    ctx.fillText(label, padL - 3, yOff + 10);
+
+    // Wave
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i <= gW; i++) {
+      const a = (i / gW) * Math.PI * 4;
+      const v = isDC ? Math.abs(Math.sin(a)) : Math.sin(a);
+      const y = midY - v * (gH / 2 - 5);
+      if (i === 0) ctx.moveTo(padL + i, y); else ctx.lineTo(padL + i, y);
+    }
+    ctx.stroke();
+
+    // Fill
+    ctx.beginPath();
+    for (let i = 0; i <= gW; i++) {
+      const a = (i / gW) * Math.PI * 4;
+      const v = isDC ? Math.abs(Math.sin(a)) : Math.sin(a);
+      const y = midY - v * (gH / 2 - 5);
+      if (i === 0) ctx.moveTo(padL + i, y); else ctx.lineTo(padL + i, y);
+    }
+    ctx.lineTo(padL + gW, midY); ctx.lineTo(padL, midY); ctx.closePath();
+    ctx.fillStyle = color.replace(')', ',0.1)').replace('rgb', 'rgba'); ctx.fill();
+  }
+
+  drawWave(padT + 5, 'AC', '#00d4ff', false);
+  drawWave(padT + gH + 25, 'DC', '#7b2fff', true);
+
+  // Cycle markers
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+  for (let i = 1; i < 4; i++) {
+    const x = padL + (i / 4) * gW;
+    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, H - padB); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+// ════════════════════════════════════════
+// INIT on first load
+// ════════════════════════════════════════
+window.addEventListener('load', () => {
+  // Draw static initial states for visible section
+  // Angle section pre-init handled on click
+});
+
+// ════════════════════════════════════════
+// SECTION 1 init on page load
+// ════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // Nothing to draw on intro
+});
+</script>
+</body>
+</html>
